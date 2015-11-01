@@ -26,6 +26,7 @@ namespace git2pp {
     };
 
 
+    inline
     void check(int rc) {
         if (rc < 0) {
             std::ostringstream oss;
