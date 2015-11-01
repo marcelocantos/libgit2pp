@@ -72,6 +72,10 @@ succinct code than raw libgit2.
       returns a raw `U *`. WARNING: Will succeed for any pair of types,
       whether it's valid or not.
 
+  * **`std::ostream & operator<<(std::ostream & os, git_oid const * oid)`:**
+    Outputs the hex representation of `oid`.
+
+
 If a libgit2 function takes additional pointer-to-T parameters and you have
 a `UniquePtr<T>`, `t`, you can pass it in as `&*t`, e.g.:
 
