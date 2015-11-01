@@ -25,9 +25,9 @@ succinct code than raw libgit2.
       git_repository * repo = NULL;
       int err = git_repository_open(&repo, ".");
       if (err < 0) {
-          ...
+          …
       }
-      ...
+      …
       git_repository_free(repo);
       git_libgit2_shutdown();
       ```
@@ -45,8 +45,8 @@ succinct code than raw libgit2.
     * **`ctor/operator=(UniquePtr const &)`:** Copies using `git_…_dup` function,
       where such a function exists.
 
-    * **`operator[]()`:** Wraps libgit2 functions with sigs `(T [const] *, ...)` or
-      `(U * *, T [const] *, ...)`, where `U` is some other output type. The resulting
+    * **`operator[]()`:** Wraps libgit2 functions with sigs `(T [const] *, …)` or
+      `(U * *, T [const] *, …)`, where `U` is some other output type. The resulting
       function removes the `T [const] *` parameter, instead passing `this` behind the
       scenes. It also removes `U * *` and instead returns `UniquePtr<U>`.
 
@@ -55,9 +55,9 @@ succinct code than raw libgit2.
       git_reference *ref = NULL;
       int err = git_reference_dwim(&ref, "master");
       if (err < 0) {
-          ...
+          …
         }
-      ...
+      …
       git_reference_free(ref);
       ```
 
@@ -77,7 +77,7 @@ a `UniquePtr<T>`, `t`, you can pass it in as `&*t`, e.g.:
 
 ```cpp
 auto me = repo[git_signature_now]("Me", "me@example.com");
-commit[git_commit_amend](..., &*me, &*me, ...);
+commit[git_commit_amend](…, &*me, &*me, …);
 ```
 
 ## Example
