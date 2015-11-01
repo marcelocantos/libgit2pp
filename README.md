@@ -112,7 +112,7 @@ bool show_commit(char const * branch) {
         goto fail;
     }
 
-    if (!(ok = git2ok(git_reference_dwim(&master, repo, "master")))) {
+    if (!(ok = git2ok(git_reference_dwim(&master, repo, branch)))) {
         goto fail;
     }
 
