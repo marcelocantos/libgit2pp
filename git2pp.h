@@ -142,7 +142,7 @@ namespace git2pp {
     template <typename T>
     class UniquePtr {
     public:
-        UniquePtr(T * t) : t_{t} { }
+        UniquePtr(T * t = nullptr) : t_{t} { }
         UniquePtr(UniquePtr const & t) : UniquePtr{t[&detail::obj_dup<T>::dup]()} { }
         UniquePtr(UniquePtr &&) = default;
 
@@ -154,7 +154,11 @@ namespace git2pp {
         }
         UniquePtr & operator=(UniquePtr &&) = default;
 
+        explicit operator bool() const { return bool(t_); }
+
         T & operator*() const { return *t_; }
+
+        T * operator->() const { return t_.get(); }
 
         template <typename U, typename... Params>
         auto operator[](int (* method)(U * *, T *, Params...)) const {
