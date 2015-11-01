@@ -56,7 +56,7 @@ succinct code than raw libgit2.
       int err = git_reference_dwim(&ref, "master");
       if (err < 0) {
           …
-        }
+      }
       …
       git_reference_free(ref);
       ```
