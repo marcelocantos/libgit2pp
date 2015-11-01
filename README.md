@@ -13,7 +13,7 @@ succinct code than raw libgit2.
 
   * **`Error`**/**`check`:** check() throws Error when a libgit2 result indicates failure.
 
-  * **`Session`:** wraps git_libgit2_init and git_libgit2_shutdown in RAII.
+  * **`Session`:** wraps `git_libgit2_init()` and `git_libgit2_shutdown()` in RAII.
 
     * **`operator[]()`:** Wraps a libgit2 function. If the wrapped function has a `T * *`
       as its first parameter, the returned function removes this parameter and instead
