@@ -1,5 +1,5 @@
 //
-//  libgitpp
+//  libgit2pp
 //
 //  https://github.com/marcelocantos/libgit2pp
 //
