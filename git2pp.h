@@ -1,3 +1,12 @@
+//
+//  libgit2pp
+//
+//  https://github.com/marcelocantos/libgit2pp
+//
+//  Distributed under the Apache License, Version 2.0. (See accompanying
+//  file LICENSE or copy at http://www.apache.org/licenses/LICENSE-2.0)
+//
+
 #ifndef GIT2PP_H
 #define GIT2PP_H
 
@@ -5,12 +14,12 @@
 
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
-
 
 inline
 std::ostream & operator<<(std::ostream & os, git_oid const * oid) {
