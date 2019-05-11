@@ -39,6 +39,10 @@ namespace git2pp {
     }
 
 
+    template <typename T>
+    class UniquePtr;
+
+
     namespace detail {
 
         template <typename T> struct obj_free {};
@@ -123,12 +127,7 @@ namespace git2pp {
         GIT2PP_OBJ_OBJECT_DUP_(commit);
         GIT2PP_OBJ_OBJECT_DUP_(tag);
         GIT2PP_OBJ_OBJECT_DUP_(tree);
-
     }
-
-
-    template <typename T>
-    class UniquePtr;
 
 
     namespace detail {
@@ -142,6 +141,8 @@ namespace git2pp {
     template <typename T>
     class UniquePtr {
     public:
+        using value_type = T;
+
         UniquePtr(T * t = nullptr) : t_{t} { }
         UniquePtr(UniquePtr const & t) : UniquePtr{t[&detail::obj_dup<T>::dup]()} { }
         UniquePtr(UniquePtr &&) = default;

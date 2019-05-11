@@ -147,3 +147,5 @@ void show_commit(char const * branch) {
     std::cout << "message = " << commit[git_commit_message]() << "\n";
 }
 ```
+
+A more complete working demo may be found in [demo](demo).
