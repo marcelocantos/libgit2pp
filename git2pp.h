@@ -48,13 +48,22 @@ namespace git2pp {
     }
 
 
-    template <typename T>
+    namespace detail {
+
+        template <typename T> struct obj_free {};
+
+        template <typename T> struct obj_no_free {
+            void operator()(T * t) const { }
+        };
+
+    }
+
+
+    template <typename T, typename Free = detail::obj_free<T>>
     class UniquePtr;
 
 
     namespace detail {
-
-        template <typename T> struct obj_free {};
 
 #define GIT2PP_OBJ_FREE_(type) \
         template <> struct obj_free<git_##type> { \
@@ -121,6 +130,7 @@ namespace git2pp {
 
         GIT2PP_OBJ_DUP_(object);
         GIT2PP_OBJ_DUP_(odb_object);
+        GIT2PP_OBJ_DUP_(reference);
         GIT2PP_OBJ_DUP_(remote);
         GIT2PP_OBJ_DUP_(signature);
         GIT2PP_OBJ_DUP_(tree_entry);
@@ -136,6 +146,75 @@ namespace git2pp {
         GIT2PP_OBJ_OBJECT_DUP_(commit);
         GIT2PP_OBJ_OBJECT_DUP_(tag);
         GIT2PP_OBJ_OBJECT_DUP_(tree);
+
+    }
+
+    template <typename I, typename T, int (*Next)(T * *, I *), typename Free = detail::obj_free<T>>
+    class Iterable {
+    public:
+        class Iterator {
+        public:
+            Iterator(UniquePtr<I> * u = nullptr) : up_{u} {
+                if (up_) {
+                    ++*this;
+                }
+            }
+
+            // Two Iterators are equal if they are both done.
+            bool operator==(Iterator const & that) { return done() && that.done(); }
+            bool operator<(Iterator const & that) { return !done() && that.done(); }
+            bool operator>(Iterator const & that) { return done() && !that.done(); }
+
+            bool operator!=(Iterator const & that) { return !(*this == that); }
+            bool operator<=(Iterator const & that) { return that.done(); }
+            bool operator>=(Iterator const & that) { return done(); }
+
+            Iterator & operator++() {
+                T * t = nullptr;
+                if (auto rc = Next(&t, &**up_)) {
+                    if (rc != GIT_ITEROVER) {
+                        check(rc);
+                    }
+                    up_ = nullptr;
+                } else {
+                    t_.reset(t);
+                }
+                return *this;
+            }
+
+            UniquePtr<T, Free> operator*() const {
+                return std::move(t_);
+            }
+
+            UniquePtr<T, Free> & operator->() const {
+                return t_;
+            }
+
+        private:
+            UniquePtr<I> * up_;
+            mutable UniquePtr<T, Free> t_;
+
+            bool done() const { return !up_; }
+        };
+
+        Iterator begin() { return Iterator{static_cast<UniquePtr<I> *>(this)}; }
+        Iterator end() { return Iterator{}; }
+    };
+
+    namespace detail {
+
+        template <typename T> class MaybeIterable {
+            using iterable = std::nullptr_t;
+        };
+
+        template <> class MaybeIterable<UniquePtr<git_reference_iterator>>
+        : public Iterable<git_reference_iterator, git_reference, git_reference_next> {
+        };
+
+        template <> class MaybeIterable<UniquePtr<git_config_iterator>>
+        : public Iterable<git_config_iterator, git_config_entry, git_config_next, obj_no_free<git_config_entry>> {
+        };
+
     }
 
 
@@ -147,13 +226,13 @@ namespace git2pp {
     }
 
 
-    template <typename T>
-    class UniquePtr {
+    template <typename T, typename Free>
+    class UniquePtr : public detail::MaybeIterable<UniquePtr<T>> {
     public:
         using value_type = T;
 
         UniquePtr(T * t = nullptr) : t_{t} { }
-        UniquePtr(UniquePtr const & t) : UniquePtr{t[&detail::obj_dup<T>::dup]()} { }
+        // UniquePtr(UniquePtr const & t) : UniquePtr{t[&detail::obj_dup<T>::dup]()} { }
         UniquePtr(UniquePtr &&) = default;
 
         UniquePtr & operator=(UniquePtr const & t) {
@@ -164,11 +243,18 @@ namespace git2pp {
         }
         UniquePtr & operator=(UniquePtr &&) = default;
 
+        void reset(T * t = nullptr) {
+            t_.reset(t);
+        }
+
         explicit operator bool() const { return bool(t_); }
 
         T & operator*() const { return *t_; }
 
         T * operator->() const { return t_.get(); }
+
+        bool operator==(UniquePtr const & that) const { return t_ == that.t_; }
+        bool operator!=(UniquePtr const & that) const { return t_ != that.t_; }
 
         template <typename U, typename... Params>
         auto operator[](int (* method)(U * *, T *, Params...)) const {
@@ -209,7 +295,7 @@ namespace git2pp {
         }
 
     private:
-        std::unique_ptr<T, detail::obj_free<T>> t_;
+        std::unique_ptr<T, Free> t_;
     };
 
 
