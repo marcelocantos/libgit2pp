@@ -1,4 +1,4 @@
-CXXFLAGS = -std=c++17
+CXXFLAGS += -std=c++17
 LDLIBS = -lgit2
 LINK.o = $(LINK.cc)
 
