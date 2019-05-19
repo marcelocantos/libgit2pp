@@ -211,6 +211,10 @@ namespace git2pp {
         : public Iterable<git_config_iterator, git_config_entry, git_config_next, obj_no_free<git_config_entry>> {
         };
 
+        template <> class MaybeIterable<UniquePtr<git_index_iterator>>
+        : public Iterable<git_index_iterator, const git_index_entry, git_index_iterator_next> {
+        };
+
         template <> class MaybeIterable<UniquePtr<git_reference_iterator>>
         : public Iterable<git_reference_iterator, git_reference, git_reference_next> {
         };
