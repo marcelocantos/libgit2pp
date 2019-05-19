@@ -207,12 +207,12 @@ namespace git2pp {
             using iterable = std::nullptr_t;
         };
 
-        template <> class MaybeIterable<UniquePtr<git_reference_iterator>>
-        : public Iterable<git_reference_iterator, git_reference, git_reference_next> {
-        };
-
         template <> class MaybeIterable<UniquePtr<git_config_iterator>>
         : public Iterable<git_config_iterator, git_config_entry, git_config_next, obj_no_free<git_config_entry>> {
+        };
+
+        template <> class MaybeIterable<UniquePtr<git_reference_iterator>>
+        : public Iterable<git_reference_iterator, git_reference, git_reference_next> {
         };
 
     }
