@@ -239,7 +239,7 @@ namespace git2pp {
         using value_type = T;
 
         UniquePtr(T * t = nullptr) : t_{t} { }
-        UniquePtr(UniquePtr const & t) : UniquePtr{t[&detail::obj_dup<T>::dup]()} { }
+        UniquePtr(UniquePtr const & t) : UniquePtr{t ? t[&detail::obj_dup<T>::dup]() : nullptr} { }
         UniquePtr(UniquePtr &&) = default;
 
         UniquePtr & operator=(UniquePtr const & t) {
