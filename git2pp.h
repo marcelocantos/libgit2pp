@@ -227,6 +227,9 @@ namespace git2pp {
         template <typename T, typename... Params, typename... Args>
         UniquePtr<T> wrap(int (*f)(T * * t, Params... params), Args &&... args);
 
+        template <typename... Params, typename... Args>
+        git_oid wrapOid(int (*f)(git_oid * oid, Params... params), Args &&... args);
+
     }
 
 
@@ -275,6 +278,13 @@ namespace git2pp {
         }
 
         template <typename R, typename... Params>
+        auto operator[](R (* method)(git_oid *, Params...)) const {
+            return [this, method](auto &&... args) {
+                return detail::wrapOid(method, &*t_, std::forward<decltype(args)>(args)...);
+            };
+        }
+
+        template <typename R, typename... Params>
         auto operator[](R (* method)(T *, Params...)) const {
             return [this, method](auto &&... args) {
                 return method(&*t_, std::forward<decltype(args)>(args)...);
@@ -310,6 +320,13 @@ namespace git2pp {
             T * t;
             check(f(&t, std::forward<Args>(args)...));
             return {t};
+        }
+
+        template <typename... Params, typename... Args>
+        git_oid wrapOid(int (*f)(git_oid * oid, Params... params), Args &&... args) {
+            git_oid oid;
+            check(f(&oid, std::forward<Args>(args)...));
+            return oid;
         }
 
     }
