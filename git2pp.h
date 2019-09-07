@@ -156,16 +156,13 @@ namespace git2pp {
 
     }
 
-    template <typename I, typename T, int (*Next)(T * *, I *), typename Free = detail::obj_free<T>>
+    template <typename I, typename T, typename Next, typename Free = detail::obj_free<T>>
     class Iterable {
     public:
         class Iterator {
         public:
-            Iterator(UniquePtr<I> * u = nullptr) : up_{u} {
-                if (up_) {
-                    ++*this;
-                }
-            }
+            Iterator(Next next, UniquePtr<I> * u) : next_{std::move(next)}, up_{u} { ++*this; }
+            Iterator() : up_{nullptr} {}
 
             // Two Iterators are equal if they are both done.
             bool operator==(Iterator const & that) { return done() && that.done(); }
@@ -178,7 +175,7 @@ namespace git2pp {
 
             Iterator & operator++() {
                 T * t = nullptr;
-                if (auto rc = Next(&t, &**up_)) {
+                if (auto rc = next_(&t, &**up_)) {
                     if (rc != GIT_ITEROVER) {
                         check(rc);
                     }
@@ -198,14 +195,20 @@ namespace git2pp {
             }
 
         private:
+            Next next_;
             UniquePtr<I> * up_;
             mutable UniquePtr<T, Free> t_;
 
             bool done() const { return !up_; }
         };
 
-        Iterator begin() { return Iterator{static_cast<UniquePtr<I> *>(this)}; }
+        Iterable(Next next) : next_(std::move(next)) { }
+
+        Iterator begin() { return Iterator{next_, static_cast<UniquePtr<I> *>(this)}; }
         Iterator end() { return Iterator{}; }
+
+    private:
+        Next next_;
     };
 
     namespace detail {
@@ -214,22 +217,28 @@ namespace git2pp {
             using iterable = std::nullptr_t;
         };
 
-        template <> class MaybeIterable<UniquePtr<git_config_iterator>>
-        : public Iterable<git_config_iterator, git_config_entry, git_config_next, obj_no_free<git_config_entry>> {
+        using ConfigIterable = Iterable<git_config_iterator, git_config_entry, decltype(&git_config_next), obj_no_free<git_config_entry>>;
+        template <> class MaybeIterable<UniquePtr<git_config_iterator>> : public ConfigIterable {
+        public:
+            MaybeIterable() : ConfigIterable(git_config_next) {}
         };
 
-        template <> class MaybeIterable<UniquePtr<git_index_iterator>>
-        : public Iterable<git_index_iterator, const git_index_entry, git_index_iterator_next> {
+        using IndexIteratorIterable = Iterable<git_index_iterator, const git_index_entry, decltype(&git_index_iterator_next)>;
+        template <> class MaybeIterable<UniquePtr<git_index_iterator>> : public IndexIteratorIterable {
+        public:
+            MaybeIterable() : IndexIteratorIterable(git_index_iterator_next) {}
         };
 
-        template <> class MaybeIterable<UniquePtr<git_reference_iterator>>
-        : public Iterable<git_reference_iterator, git_reference, git_reference_next> {
+        using ReferenceIterable = Iterable<git_reference_iterator, git_reference, decltype(&git_reference_next)>;
+        template <> class MaybeIterable<UniquePtr<git_reference_iterator>> : public ReferenceIterable {
+        public:
+            MaybeIterable() : ReferenceIterable(git_reference_next) {}
         };
 
-    }
-
-
-    namespace detail {
+        // using BranchIterable = Iterable<git_branch_iterator, git_reference, decltype(&git_branch_next)>;
+        // template <> class MaybeIterable<UniquePtr<git_branch_iterator>> : public BranchIterable {
+        //     MaybeIterable() : BranchIterable(&branch) {}
+        // };
 
         template <typename T, typename... Params, typename... Args>
         UniquePtr<T> wrap(int (*f)(T * * t, Params... params), Args &&... args);
