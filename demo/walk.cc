@@ -32,6 +32,14 @@ void show_commit(char const * branch) {
     for (auto config : cfg[git_config_iterator_new]()) {
         std::cout << config->name << " = " << config->value << "\n";
     }
+
+
+    auto gitindex = repo[git_repository_index]();
+    gitindex[git_index_read](true);
+    auto ii = gitindex[git_index_iterator_new]();
+    for (auto indexentry : ii) {
+        std::cout << "index contains file:" << indexentry->path << std::endl;
+    }
 }
 
 int main(int argc, char * argv[]) {

@@ -86,6 +86,7 @@ namespace git2pp {
         GIT2PP_OBJ_FREE_(filter_list);
         //GIT2PP_OBJ_FREE_(hashsig);
         GIT2PP_OBJ_FREE_(index);
+        GIT2PP_OBJ_FREE_(index_iterator);
         GIT2PP_OBJ_FREE_(index_conflict_iterator);
         GIT2PP_OBJ_FREE_(indexer);
         GIT2PP_OBJ_FREE_(merge_file_result);
@@ -118,6 +119,12 @@ namespace git2pp {
         GIT2PP_OBJ_FREE_(tree_entry);
         GIT2PP_OBJ_FREE_(treebuilder);
 
+#define GIT2PP_OBJ_NO_FREE_(type) \
+        template <> struct obj_free<type> { \
+            void operator()(type * t) const { } \
+        };
+
+        GIT2PP_OBJ_NO_FREE_(const git_index_entry);
 
         template <typename T> struct obj_dup {};
 
@@ -263,7 +270,7 @@ namespace git2pp {
         bool operator==(UniquePtr const & that) const { return t_ == that.t_; }
         bool operator!=(UniquePtr const & that) const { return t_ != that.t_; }
 
-        template <typename U, typename... Params>
+        template <typename U, typename... Params, typename = std::enable_if<!std::is_const_v<T>>>
         auto operator[](int (* method)(U * *, T *, Params...)) const {
             return [this, method](auto &&... args) {
                 return detail::wrap(method, &*t_, std::forward<decltype(args)>(args)...);
@@ -284,7 +291,7 @@ namespace git2pp {
             };
         }
 
-        template <typename R, typename... Params>
+        template <typename R, typename... Params, typename = std::enable_if<!std::is_const_v<T>>>
         auto operator[](R (* method)(T *, Params...)) const {
             return [this, method](auto &&... args) {
                 return method(&*t_, std::forward<decltype(args)>(args)...);
