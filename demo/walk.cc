@@ -49,6 +49,7 @@ void show_commit(char const * branch) {
             std::cout << "  " << &op->id << "\n";
         }
     } catch (std::exception const & e) {
+        // Too lazy to test this properly.
         std::cout << "  failure not unexpected: " << e.what() << "\n";
     }
 }
