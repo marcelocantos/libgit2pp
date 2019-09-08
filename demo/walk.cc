@@ -9,22 +9,21 @@ void show_commit(char const * branch) {
     auto master = repo[git_reference_dwim](branch);
     auto commit = master[git_reference_peel](GIT_OBJ_COMMIT).as<git_commit>();
 
-    auto walker = repo[git_revwalk_new]();
-    walker[git_revwalk_sorting](GIT_SORT_TIME);
-    walker[git_revwalk_push](commit[git_commit_id]());
-
     auto parent0 = commit[git_commit_parent](0);
     std::cout << "master^ = " << parent0[git_commit_id]() << "\n";
     std::cout << "author = " << parent0[git_commit_author]()->name << "\n";
     std::cout << "message = " << parent0[git_commit_message]() << "\n";
 
-    std::cout << "oids:\n";
-    git_oid oid;
-    while (!git_revwalk_next(&oid, &*walker)) {
+    auto revwalk = repo[git_revwalk_new]();
+    revwalk[git_revwalk_sorting](GIT_SORT_TIME);
+    revwalk[git_revwalk_push](commit[git_commit_id]());
+
+    std::cout << "revs:\n";
+    for (auto oid : revwalk) {
         std::cout << "  " << &oid << "\n";
     }
 
-    std::cout << "config:\n";
+    std::cout << "refs:\n";
     for (auto ref : repo[git_reference_iterator_new]()) {
         std::cout << "  " << ref[git_reference_name]() << "\n";
     }
