@@ -368,8 +368,8 @@ namespace git2pp {
         friend base;
     };
 
-    template <typename I, typename NextF, typename T, typename Free = detail::obj_free<T>>
-    class BranchIterator : public IteratorBase<I, NextF, BranchIterator<I, NextF, T, Free>> {
+    template <typename I, typename NextF>
+    class BranchIterator : public IteratorBase<I, NextF, BranchIterator<I, NextF>> {
     private:
         using base = IteratorBase<I, NextF, BranchIterator>;
     public:
@@ -385,15 +385,44 @@ namespace git2pp {
             git_reference * ref;
             git_branch_t type;
             if ((rc = base::next_(&ref, &type, &**base::i_)) == 0) {
-                bi_ = {ref, type};
+                e_ = {ref, type};
             }
         }
 
-        Entry const & operator*() const { return bi_; }
-        Entry const * operator->() const { return &bi_; }
+        Entry const & operator*() const { return e_; }
+        Entry const * operator->() const { return &e_; }
 
     private:
-        Entry bi_;
+        Entry e_;
+        friend base;
+    };
+
+    template <typename I, typename NextF>
+    class IndexConflictIterator : public IteratorBase<I, NextF, IndexConflictIterator<I, NextF>> {
+    private:
+        using base = IteratorBase<I, NextF, IndexConflictIterator>;
+    public:
+        struct Entry {
+            git_index_entry const * ancestor;
+            git_index_entry const * our;
+            git_index_entry const * their;
+        };
+
+        IndexConflictIterator(UniquePtr<I> * i, NextF next) : base{i, std::move(next)} { ++*this; }
+        IndexConflictIterator() = default;
+
+        void increment(int & rc) {
+            Entry e;
+            if ((rc = base::next_(&e.ancestor, &e.our, &e.their, &**base::i_)) == 0) {
+                e_ = e;
+            }
+        }
+
+        Entry const & operator*() const { return e_; }
+        Entry const * operator->() const { return &e_; }
+
+    private:
+        Entry e_;
         friend base;
     };
 
@@ -406,7 +435,7 @@ namespace git2pp {
 
         Iterable(next_f next) : next_(std::move(next)) { }
 
-        Iterator begin() { return {static_cast<UniquePtr<typename Iterator::git_iterator> *>(this), next_}; }
+        Iterator begin() { return {static_cast<UniquePtr<git_iterator> *>(this), next_}; }
         Iterator end() { return {}; }
 
     private:
@@ -445,10 +474,16 @@ namespace git2pp {
             MaybeIterable() : RevwalkIterable(git_revwalk_next) {}
         };
 
-        using BranchIterable = Iterable<BranchIterator<git_branch_iterator, decltype(&git_branch_next), git_reference>>;
+        using BranchIterable = Iterable<BranchIterator<git_branch_iterator, decltype(&git_branch_next)>>;
         template <> class MaybeIterable<UniquePtr<git_branch_iterator>> : public BranchIterable {
         public:
             MaybeIterable() : BranchIterable(git_branch_next) {}
+        };
+
+        using IndexConflictIterable = Iterable<IndexConflictIterator<git_index_conflict_iterator, decltype(&git_index_conflict_next)>>;
+        template <> class MaybeIterable<UniquePtr<git_index_conflict_iterator>> : public IndexConflictIterable {
+        public:
+            MaybeIterable() : IndexConflictIterable(git_index_conflict_next) {}
         };
 
     }

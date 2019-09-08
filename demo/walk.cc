@@ -38,9 +38,16 @@ void show_commit(char const * branch) {
         std::cout << "  " << config->name << " = " << config->value << "\n";
     }
 
+    auto index = repo[git_repository_index]();
+
     std::cout << "index:\n";
-    for (auto entry : repo[git_repository_index]()[git_index_iterator_new]()) {
+    for (auto entry : index[git_index_iterator_new]()) {
         std::cout << "  " << entry->path << "\n";
+    }
+
+    std::cout << "index conflicts:\n";
+    for (auto conflict : index[git_index_conflict_iterator_new]()) {
+        std::cout << "  " << conflict.ancestor << "\n";
     }
 
     try {
