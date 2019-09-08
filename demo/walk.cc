@@ -12,31 +12,31 @@ void show_commit(char const * branch) {
     auto walker = repo[git_revwalk_new]();
     walker[git_revwalk_sorting](GIT_SORT_TIME);
     walker[git_revwalk_push](commit[git_commit_id]());
-    git_oid oid;
-    while (!git_revwalk_next(&oid, &*walker)) {
-        std::cout << &oid << "\n";
-    }
-    std::cout << "\n";
 
     auto parent0 = commit[git_commit_parent](0);
     std::cout << "master^ = " << parent0[git_commit_id]() << "\n";
     std::cout << "author = " << parent0[git_commit_author]()->name << "\n";
     std::cout << "message = " << parent0[git_commit_message]() << "\n";
 
+    std::cout << "oids:\n";
+    git_oid oid;
+    while (!git_revwalk_next(&oid, &*walker)) {
+        std::cout << "  " << &oid << "\n";
+    }
+
+    std::cout << "config:\n";
     for (auto ref : repo[git_reference_iterator_new]()) {
-        std::cout << ref[git_reference_name]() << "\n";
-    }
-    std::cout << "\n";
-
-    auto cfg = repo[git_repository_config]();
-    for (auto config : cfg[git_config_iterator_new]()) {
-        std::cout << config->name << " = " << config->value << "\n";
+        std::cout << "  " << ref[git_reference_name]() << "\n";
     }
 
-    auto index = repo[git_repository_index]();
-    index[git_index_read](true);
-    for (auto indexentry : index[git_index_iterator_new]()) {
-        std::cout << "index contains file:" << indexentry->path << std::endl;
+    std::cout << "config:\n";
+    for (auto config : repo[git_repository_config]()[git_config_iterator_new]()) {
+        std::cout << "  " << config->name << " = " << config->value << "\n";
+    }
+
+    std::cout << "index:\n";
+    for (auto indexentry : repo[git_repository_index]()[git_index_iterator_new]()) {
+        std::cout << "  " << indexentry->path << "\n";
     }
 }
 
