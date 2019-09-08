@@ -50,6 +50,11 @@ void show_commit(char const * branch) {
         std::cout << "  " << conflict.ancestor << "\n";
     }
 
+    std::cout << "notes:\n";
+    for (auto note : repo[git_note_iterator_new]("refs/notes/commits")) {
+        std::cout << "  " << &note.note_id << "\n";
+    }
+
     try {
         std::cout << "rebase:\n";
         for (auto op : repo[git_rebase_init](nullptr, nullptr, nullptr, nullptr)) {

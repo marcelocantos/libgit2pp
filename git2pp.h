@@ -426,6 +426,34 @@ namespace git2pp {
         friend base;
     };
 
+    template <typename I, typename NextF>
+    class NoteIterator : public IteratorBase<I, NextF, NoteIterator<I, NextF>> {
+    private:
+        using base = IteratorBase<I, NextF, NoteIterator>;
+    public:
+        struct Entry {
+            git_oid note_id;
+            git_oid annotated_id;
+        };
+
+        NoteIterator(UniquePtr<I> * i, NextF next) : base{i, std::move(next)} { ++*this; }
+        NoteIterator() = default;
+
+        void increment(int & rc) {
+            Entry e;
+            if ((rc = base::next_(&e.note_id, &e.annotated_id, &**base::i_)) == 0) {
+                e_ = e;
+            }
+        }
+
+        Entry const & operator*() const { return e_; }
+        Entry const * operator->() const { return &e_; }
+
+    private:
+        Entry e_;
+        friend base;
+    };
+
     template <typename Iterator>
     class Iterable {
     public:
@@ -484,6 +512,12 @@ namespace git2pp {
         template <> class MaybeIterable<UniquePtr<git_index_conflict_iterator>> : public IndexConflictIterable {
         public:
             MaybeIterable() : IndexConflictIterable(git_index_conflict_next) {}
+        };
+
+        using NoteIterable = Iterable<NoteIterator<git_note_iterator, decltype(&git_note_next)>>;
+        template <> class MaybeIterable<UniquePtr<git_note_iterator>> : public NoteIterable {
+        public:
+            MaybeIterable() : NoteIterable(git_note_next) {}
         };
 
     }
