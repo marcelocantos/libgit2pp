@@ -28,6 +28,11 @@ void show_commit(char const * branch) {
         std::cout << "  " << ref[git_reference_name]() << "\n";
     }
 
+    std::cout << "branches:\n";
+    for (auto branch : repo[git_branch_iterator_new](GIT_BRANCH_ALL)) {
+        std::cout << "  " << branch.ref[git_reference_name]() << (branch.type == GIT_BRANCH_LOCAL ? "" : " (remote)") << "\n";
+    }
+
     std::cout << "config:\n";
     for (auto config : repo[git_repository_config]()[git_config_iterator_new]()) {
         std::cout << "  " << config->name << " = " << config->value << "\n";
