@@ -34,8 +34,8 @@ void show_commit(char const * branch) {
     }
 
     std::cout << "index:\n";
-    for (auto indexentry : repo[git_repository_index]()[git_index_iterator_new]()) {
-        std::cout << "  " << indexentry->path << "\n";
+    for (auto entry : repo[git_repository_index]()[git_index_iterator_new]()) {
+        std::cout << "  " << entry->path << "\n";
     }
 
     try {
