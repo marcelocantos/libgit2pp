@@ -156,89 +156,11 @@ namespace git2pp {
 
     }
 
-    template <typename I, typename T, typename Next, typename Free = detail::obj_free<T>>
-    class Iterable {
-    public:
-        class Iterator {
-        public:
-            Iterator(Next next, UniquePtr<I> * u) : next_{std::move(next)}, up_{u} { ++*this; }
-            Iterator() : up_{nullptr} {}
-
-            // Two Iterators are equal if they are both done.
-            bool operator==(Iterator const & that) { return done() && that.done(); }
-            bool operator<(Iterator const & that) { return !done() && that.done(); }
-            bool operator>(Iterator const & that) { return done() && !that.done(); }
-
-            bool operator!=(Iterator const & that) { return !(*this == that); }
-            bool operator<=(Iterator const & that) { return that.done(); }
-            bool operator>=(Iterator const & that) { return done(); }
-
-            Iterator & operator++() {
-                T * t = nullptr;
-                if (auto rc = next_(&t, &**up_)) {
-                    if (rc != GIT_ITEROVER) {
-                        check(rc);
-                    }
-                    up_ = nullptr;
-                } else {
-                    t_.reset(t);
-                }
-                return *this;
-            }
-
-            UniquePtr<T, Free> operator*() const {
-                return std::move(t_);
-            }
-
-            UniquePtr<T, Free> & operator->() const {
-                return t_;
-            }
-
-        private:
-            Next next_;
-            UniquePtr<I> * up_;
-            mutable UniquePtr<T, Free> t_;
-
-            bool done() const { return !up_; }
-        };
-
-        Iterable(Next next) : next_(std::move(next)) { }
-
-        Iterator begin() { return Iterator{next_, static_cast<UniquePtr<I> *>(this)}; }
-        Iterator end() { return Iterator{}; }
-
-    private:
-        Next next_;
-    };
-
     namespace detail {
 
         template <typename T> class MaybeIterable {
             using iterable = std::nullptr_t;
         };
-
-        using ConfigIterable = Iterable<git_config_iterator, git_config_entry, decltype(&git_config_next), obj_no_free<git_config_entry>>;
-        template <> class MaybeIterable<UniquePtr<git_config_iterator>> : public ConfigIterable {
-        public:
-            MaybeIterable() : ConfigIterable(git_config_next) {}
-        };
-
-        using IndexIteratorIterable = Iterable<git_index_iterator, const git_index_entry, decltype(&git_index_iterator_next)>;
-        template <> class MaybeIterable<UniquePtr<git_index_iterator>> : public IndexIteratorIterable {
-        public:
-            MaybeIterable() : IndexIteratorIterable(git_index_iterator_next) {}
-        };
-
-        using ReferenceIterable = Iterable<git_reference_iterator, git_reference, decltype(&git_reference_next)>;
-        template <> class MaybeIterable<UniquePtr<git_reference_iterator>> : public ReferenceIterable {
-        public:
-            MaybeIterable() : ReferenceIterable(git_reference_next) {}
-        };
-
-        // using BranchIterable = Iterable<git_branch_iterator, git_reference, decltype(&git_branch_next)>;
-        // template <> class MaybeIterable<UniquePtr<git_branch_iterator>> : public BranchIterable {
-        //     MaybeIterable() : BranchIterable(&branch) {}
-        // };
 
         template <typename T, typename... Params, typename... Args>
         UniquePtr<T> wrap(int (*f)(T * * t, Params... params), Args &&... args);
@@ -250,7 +172,7 @@ namespace git2pp {
 
 
     template <typename T, typename Free>
-    class UniquePtr : public detail::MaybeIterable<UniquePtr<T>> {
+    class UniquePtr : public detail::MaybeIterable<UniquePtr<T, Free>> {
     public:
         using value_type = T;
 
@@ -347,7 +269,6 @@ namespace git2pp {
 
     }
 
-
     class Session {
     public:
         Session() {
@@ -365,6 +286,131 @@ namespace git2pp {
             };
         }
     };
+
+    template <typename I, typename NextF, typename Derived>
+    class IteratorBase {
+    public:
+        using git_iterator = I;
+        using next_f = NextF;
+
+        IteratorBase(UniquePtr<I> * i, NextF next) : i_{i}, next_{std::move(next)} { }
+        IteratorBase() : i_{nullptr} {}
+        IteratorBase(IteratorBase const &) = delete;
+        IteratorBase(IteratorBase &&) = delete;
+
+        bool operator==(Derived const & that) { return done() && that.done(); }
+        bool operator!=(Derived const & that) { return !(*this == that); }
+
+        Derived & operator++() {
+            auto self = static_cast<Derived *>(this);
+            int rc;
+            self->increment(rc);
+            if (rc != 0) {
+                if (rc != GIT_ITEROVER) {
+                    check(rc);
+                }
+                this->i_ = nullptr;
+            }
+            return *self;
+        }
+
+    protected:
+        NextF next_;
+        UniquePtr<I> * i_;
+
+    private:
+        bool done() const { return !i_; }
+    };
+
+    template <typename I, typename NextF, typename T, typename Free = detail::obj_free<T>>
+    class Iterator : public IteratorBase<I, NextF, Iterator<I, NextF, T, Free>> {
+    private:
+        using base = IteratorBase<I, NextF, Iterator>;
+    public:
+        Iterator(UniquePtr<I> * i, NextF next) : base{i, std::move(next)} { ++*this; }
+        Iterator() = default;
+
+        void increment(int & rc) {
+            T * t = nullptr;
+            if ((rc = base::next_(&t, &**base::i_)) == 0) {
+                t_.reset(t);
+            }
+        }
+
+        UniquePtr<T, Free> operator*() const { return std::move(t_); }
+        UniquePtr<T, Free> & operator->() const { return t_; }
+
+    private:
+        mutable UniquePtr<T, Free> t_;
+        friend base;
+    };
+
+    template <typename I, typename NextF>
+    class OidIterator : public IteratorBase<I, NextF, OidIterator<I, NextF>> {
+    private:
+        using base = IteratorBase<I, NextF, OidIterator>;
+    public:
+        OidIterator(UniquePtr<I> * i, NextF next) : base{i, std::move(next)} { ++*this; }
+        OidIterator() = default;
+
+        void increment(int & rc) {
+            git_oid oid;
+            if ((rc = base::next_(&oid, &**base::i_)) == 0) {
+                oid_ = oid;
+            }
+        }
+
+        git_oid operator*() const { return oid_; }
+        git_oid & operator->() const { return oid_; }
+
+    private:
+        mutable git_oid oid_;
+        friend base;
+    };
+
+    template <typename Iterator>
+    class Iterable {
+    public:
+        using iterator = Iterator;
+        using git_iterator = typename iterator::git_iterator;
+        using next_f = typename iterator::next_f;
+
+        Iterable(next_f next) : next_(std::move(next)) { }
+
+        Iterator begin() { return {static_cast<UniquePtr<typename Iterator::git_iterator> *>(this), next_}; }
+        Iterator end() { return {}; }
+
+    private:
+        next_f next_;
+    };
+
+    namespace detail {
+
+        using ConfigIterable = Iterable<Iterator<git_config_iterator, decltype(&git_config_next), git_config_entry, obj_no_free<git_config_entry>>>;
+        template <> class MaybeIterable<UniquePtr<git_config_iterator>> : public ConfigIterable {
+        public:
+            MaybeIterable() : ConfigIterable(git_config_next) {}
+        };
+
+        using IndexIteratorIterable = Iterable<Iterator<git_index_iterator, decltype(&git_index_iterator_next), const git_index_entry>>;
+        template <> class MaybeIterable<UniquePtr<git_index_iterator>> : public IndexIteratorIterable {
+        public:
+            MaybeIterable() : IndexIteratorIterable(git_index_iterator_next) {}
+        };
+
+        using ReferenceIterable = Iterable<Iterator<git_reference_iterator, decltype(&git_reference_next), git_reference>>;
+        template <> class MaybeIterable<UniquePtr<git_reference_iterator>> : public ReferenceIterable {
+        public:
+            MaybeIterable() : ReferenceIterable(git_reference_next) {}
+        };
+
+        using RevwalkIterable = Iterable<OidIterator<git_revwalk, decltype(&git_revwalk_next)>>;
+        template <> class MaybeIterable<UniquePtr<git_revwalk>> : public RevwalkIterable {
+        public:
+            MaybeIterable() : RevwalkIterable(git_revwalk_next) {}
+        };
+
+    }
 
 }
 
