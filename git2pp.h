@@ -345,26 +345,26 @@ namespace git2pp {
         friend base;
     };
 
-    template <typename I, typename NextF>
-    class OidIterator : public IteratorBase<I, NextF, OidIterator<I, NextF>> {
+    template <typename I, typename NextF, typename T>
+    class StructIterator : public IteratorBase<I, NextF, StructIterator<I, NextF, T>> {
     private:
-        using base = IteratorBase<I, NextF, OidIterator>;
+        using base = IteratorBase<I, NextF, StructIterator>;
     public:
-        OidIterator(UniquePtr<I> * i, NextF next) : base{i, std::move(next)} { ++*this; }
-        OidIterator() = default;
+        StructIterator(UniquePtr<I> * i, NextF next) : base{i, std::move(next)} { ++*this; }
+        StructIterator() = default;
 
         void increment(int & rc) {
-            git_oid oid;
-            if ((rc = base::next_(&oid, &**base::i_)) == 0) {
-                oid_ = oid;
+            T t;
+            if ((rc = base::next_(&t, &**base::i_)) == 0) {
+                t_ = t;
             }
         }
 
-        git_oid operator*() const { return oid_; }
-        git_oid & operator->() const { return oid_; }
+        T operator*() const { return t_; }
+        T & operator->() const { return t_; }
 
     private:
-        mutable git_oid oid_;
+        mutable T t_;
         friend base;
     };
 
@@ -404,11 +404,22 @@ namespace git2pp {
             MaybeIterable() : ReferenceIterable(git_reference_next) {}
         };
 
-        using RevwalkIterable = Iterable<OidIterator<git_revwalk, decltype(&git_revwalk_next)>>;
+        using RebaseIterable = Iterable<StructIterator<git_rebase, decltype(&git_rebase_next), git_rebase_operation *>>;
+        template <> class MaybeIterable<UniquePtr<git_rebase>> : public RebaseIterable {
+        public:
+            MaybeIterable() : RebaseIterable(git_rebase_next) {}
+        };
+
+        using RevwalkIterable = Iterable<StructIterator<git_revwalk, decltype(&git_revwalk_next), git_oid>>;
         template <> class MaybeIterable<UniquePtr<git_revwalk>> : public RevwalkIterable {
         public:
             MaybeIterable() : RevwalkIterable(git_revwalk_next) {}
         };
+
+        // using BranchIterable = Iterable<>;
+        // template <> class MaybeIterable<UniquePtr<git_branch_iterator>> : public BranchIterable {
+        //     MaybeIterable() : BranchIterable(&branch) {}
+        // };
 
     }
 

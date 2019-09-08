@@ -37,6 +37,15 @@ void show_commit(char const * branch) {
     for (auto indexentry : repo[git_repository_index]()[git_index_iterator_new]()) {
         std::cout << "  " << indexentry->path << "\n";
     }
+
+    try {
+        std::cout << "rebase:\n";
+        for (auto op : repo[git_rebase_init](nullptr, nullptr, nullptr, nullptr)) {
+            std::cout << "  " << &op->id << "\n";
+        }
+    } catch (std::exception const & e) {
+        std::cout << "  failure not unexpected: " << e.what() << "\n";
+    }
 }
 
 int main(int argc, char * argv[]) {
