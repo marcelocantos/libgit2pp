@@ -331,7 +331,7 @@ namespace git2pp {
         Iterator() = default;
 
         void increment(int & rc) {
-            T * t = nullptr;
+            T * t;
             if ((rc = base::next_(&t, &**base::i_)) == 0) {
                 t_.reset(t);
             }
@@ -365,6 +365,34 @@ namespace git2pp {
 
     private:
         mutable T t_;
+        friend base;
+    };
+
+    struct BranchInfo {
+        const git_reference * ref;
+        const git_branch_t type;
+    };
+
+    template <typename I, typename NextF, typename T, typename Free = detail::obj_free<T>>
+    class BranchIterator : public IteratorBase<I, NextF, BranchIterator<I, NextF, T, Free>> {
+    private:
+        using base = IteratorBase<I, NextF, BranchIterator>;
+    public:
+        BranchIterator(UniquePtr<I> * i, NextF next) : base{i, std::move(next)} { ++*this; }
+        BranchIterator() = default;
+
+        void increment(int & rc) {
+            BranchInfo bi;
+            if ((rc = base::next_(&t, out_type_, &**base::i_)) == 0) {
+                t_.reset(t);
+            }
+        }
+
+        BranchInfo operator*() const { return std::move(t_); }
+        BranchInfo & operator->() const { return t_; }
+
+    private:
+        BranchInfo bi_;
         friend base;
     };
 
@@ -416,10 +444,10 @@ namespace git2pp {
             MaybeIterable() : RevwalkIterable(git_revwalk_next) {}
         };
 
-        // using BranchIterable = Iterable<>;
-        // template <> class MaybeIterable<UniquePtr<git_branch_iterator>> : public BranchIterable {
-        //     MaybeIterable() : BranchIterable(&branch) {}
-        // };
+        using BranchIterable = Iterable<>;
+        template <> class MaybeIterable<UniquePtr<git_branch_iterator>> : public BranchIterable {
+            MaybeIterable() : BranchIterable(&branch) {}
+        };
 
     }
 
