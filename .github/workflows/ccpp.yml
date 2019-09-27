@@ -9,6 +9,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@v1
+    - name: get libgit2
+      run: apt install libgit2-dev
     - name: make
       working-directory: demo
       run: make
