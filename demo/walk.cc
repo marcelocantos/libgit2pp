@@ -2,15 +2,15 @@
 
 #include "../git2pp.h"
 
-void show_commit(char const * branch) {
+void show_commit(char const * shorthand) {
     git2pp::Session git2;
 
     auto repo = git2[git_repository_open_ext](".", 0, nullptr);
-    auto master = repo[git_reference_dwim](branch);
+    auto master = repo[git_reference_dwim](shorthand);
     auto commit = master[git_reference_peel](GIT_OBJ_COMMIT).as<git_commit>();
 
     auto parent0 = commit[git_commit_parent](0);
-    std::cout << "master^ = " << parent0[git_commit_id]() << "\n";
+    std::cout << shorthand << "^ = " << parent0[git_commit_id]() << "\n";
     std::cout << "author = " << parent0[git_commit_author]()->name << "\n";
     std::cout << "message = " << parent0[git_commit_message]() << "\n";
 
