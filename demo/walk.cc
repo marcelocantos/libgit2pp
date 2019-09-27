@@ -55,16 +55,16 @@ void show_commit(char const * shorthand) {
     char const * notes = "refs/notes/commits";
     try {
         std::cout << "notes:\n";
-        for (auto note : repo[git_note_iterator_new](notes)) {
+        for (auto && note : repo[git_note_iterator_new](notes)) {
             std::cout << "  " << &note.note_id << "\n";
         }
     } catch (std::exception const & e) {
-        std::cerr << "Error accessing " << notes << ": " << e.what() << "\n";
+        std::cerr << "  Error accessing " << notes << ": " << e.what() << "\n";
     }
 
     try {
         std::cout << "rebase:\n";
-        for (auto op : repo[git_rebase_init](nullptr, nullptr, nullptr, nullptr)) {
+        for (auto && op : repo[git_rebase_init](nullptr, nullptr, nullptr, nullptr)) {
             std::cout << "  " << &op->id << "\n";
         }
     } catch (std::exception const & e) {
