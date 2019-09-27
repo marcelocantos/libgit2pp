@@ -19,45 +19,47 @@ void show_commit(char const * branch) {
     revwalk[git_revwalk_push](commit[git_commit_id]());
 
     std::cout << "revs:\n";
-    for (auto oid : revwalk) {
+    for (auto && oid : revwalk) {
         std::cout << "  " << &oid << "\n";
     }
 
     std::cout << "refs:\n";
-    for (auto ref : repo[git_reference_iterator_new]()) {
+    for (auto && ref : repo[git_reference_iterator_new]()) {
         std::cout << "  " << ref[git_reference_name]() << "\n";
     }
 
     std::cout << "branches:\n";
-    for (auto branch : repo[git_branch_iterator_new](GIT_BRANCH_ALL)) {
+    for (auto && branch : repo[git_branch_iterator_new](GIT_BRANCH_ALL)) {
         std::cout << "  " << branch.ref[git_reference_name]() << (branch.type == GIT_BRANCH_LOCAL ? "" : " (remote)") << "\n";
     }
 
     std::cout << "config:\n";
-    for (auto config : repo[git_repository_config]()[git_config_iterator_new]()) {
+    for (auto && config : repo[git_repository_config]()[git_config_iterator_new]()) {
         std::cout << "  " << config->name << " = " << config->value << "\n";
     }
 
     auto index = repo[git_repository_index]();
 
+#if LIBGIT2PP_HAVE_INDEX_ITERATOR
     std::cout << "index:\n";
-    for (auto entry : index[git_index_iterator_new]()) {
+    for (auto && entry : index[git_index_iterator_new]()) {
         std::cout << "  " << entry->path << "\n";
     }
+#endif
 
     std::cout << "index conflicts:\n";
-    for (auto conflict : index[git_index_conflict_iterator_new]()) {
+    for (auto && conflict : index[git_index_conflict_iterator_new]()) {
         std::cout << "  " << conflict.ancestor << "\n";
     }
 
     std::cout << "notes:\n";
-    for (auto note : repo[git_note_iterator_new]("refs/notes/commits")) {
+    for (auto && note : repo[git_note_iterator_new]("refs/notes/commits")) {
         std::cout << "  " << &note.note_id << "\n";
     }
 
     try {
         std::cout << "rebase:\n";
-        for (auto op : repo[git_rebase_init](nullptr, nullptr, nullptr, nullptr)) {
+        for (auto && op : repo[git_rebase_init](nullptr, nullptr, nullptr, nullptr)) {
             std::cout << "  " << &op->id << "\n";
         }
     } catch (std::exception const & e) {

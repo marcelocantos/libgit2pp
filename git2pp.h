@@ -12,6 +12,17 @@
 
 #include <git2.h>
 
+#if !(LIBGIT2_VER_MAJOR == 0 && LIBGIT2_VER_MINOR < 28)
+# define LIBGIT2PP_HAVE_INDEX_ITERATOR 1
+#else
+# define LIBGIT2PP_HAVE_INDEX_ITERATOR 0
+#endif
+#if !(LIBGIT2_VER_MAJOR == 0 && LIBGIT2_VER_MINOR < 25)
+# define LIBGIT2PP_HAVE_REFERENCE_DUP 1
+#else
+# define LIBGIT2PP_HAVE_REFERENCE_DUP 0
+#endif
+
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -66,8 +77,8 @@ namespace git2pp {
     namespace detail {
 
 #define GIT2PP_OBJ_FREE_(type) \
-        template <> struct obj_free<git_##type> { \
-            void operator()(git_##type * t) const { git_##type##_free(t); } \
+        template <> struct obj_free<::git_##type> { \
+            void operator()(::git_##type * t) const { ::git_##type##_free(t); } \
         };
 
         GIT2PP_OBJ_FREE_(annotated_commit);
@@ -86,7 +97,9 @@ namespace git2pp {
         GIT2PP_OBJ_FREE_(filter_list);
         //GIT2PP_OBJ_FREE_(hashsig);
         GIT2PP_OBJ_FREE_(index);
+#if LIBGIT2PP_HAVE_INDEX_ITERATOR
         GIT2PP_OBJ_FREE_(index_iterator);
+#endif
         GIT2PP_OBJ_FREE_(index_conflict_iterator);
         GIT2PP_OBJ_FREE_(indexer);
         GIT2PP_OBJ_FREE_(merge_file_result);
@@ -137,7 +150,9 @@ namespace git2pp {
 
         GIT2PP_OBJ_DUP_(object);
         GIT2PP_OBJ_DUP_(odb_object);
+#if LIBGIT2PP_HAVE_REFERENCE_DUP
         GIT2PP_OBJ_DUP_(reference);
+#endif
         GIT2PP_OBJ_DUP_(remote);
         GIT2PP_OBJ_DUP_(signature);
         GIT2PP_OBJ_DUP_(tree_entry);
@@ -177,7 +192,12 @@ namespace git2pp {
         using value_type = T;
 
         UniquePtr(T * t = nullptr) : t_{t} { }
-        UniquePtr(UniquePtr const & t) : UniquePtr{t ? t[&detail::obj_dup<T>::dup]() : nullptr} { }
+
+        template <typename U = T>
+        UniquePtr(UniquePtr const & t, std::enable_if_t<LIBGIT2PP_HAVE_REFERENCE_DUP || !std::is_same_v<U, git_reference>>* = 0)
+        : UniquePtr{t ? t[&detail::obj_dup<T>::dup]() : nullptr}
+        { }
+
         UniquePtr(UniquePtr &&) = default;
 
         UniquePtr & operator=(UniquePtr const & t) {
@@ -374,6 +394,12 @@ namespace git2pp {
         using base = IteratorBase<I, NextF, BranchIterator>;
     public:
         struct Entry {
+            Entry() = default;
+            Entry(Entry const &) = delete;
+            Entry& operator=(Entry const &) = delete;
+            Entry(Entry &&) = default;
+            Entry& operator=(Entry &&) = default;
+
             UniquePtr<git_reference> ref;
             git_branch_t type;
         };
@@ -385,7 +411,7 @@ namespace git2pp {
             git_reference * ref;
             git_branch_t type;
             if ((rc = base::next_(&ref, &type, &**base::i_)) == 0) {
-                e_ = {ref, type};
+                e_ = {std::move(ref), type};
             }
         }
 
@@ -478,11 +504,13 @@ namespace git2pp {
             MaybeIterable() : ConfigIterable(git_config_next) {}
         };
 
+#if LIBGIT2PP_HAVE_INDEX_ITERATOR
         using IndexIteratorIterable = Iterable<Iterator<git_index_iterator, decltype(&git_index_iterator_next), const git_index_entry>>;
         template <> class MaybeIterable<UniquePtr<git_index_iterator>> : public IndexIteratorIterable {
         public:
             MaybeIterable() : IndexIteratorIterable(git_index_iterator_next) {}
         };
+#endif
 
         using ReferenceIterable = Iterable<Iterator<git_reference_iterator, decltype(&git_reference_next), git_reference>>;
         template <> class MaybeIterable<UniquePtr<git_reference_iterator>> : public ReferenceIterable {
