@@ -55,7 +55,7 @@ void show_commit(char const * shorthand) {
     char const * notes = "refs/notes/commits";
     try {
         std::cout << "notes:\n";
-        for (auto && note : repo[git_note_iterator_new](notes)) {
+        for (auto note : repo[git_note_iterator_new](notes)) {
             std::cout << "  " << &note.note_id << "\n";
         }
     } catch (std::exception const & e) {
