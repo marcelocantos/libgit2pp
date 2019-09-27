@@ -64,7 +64,7 @@ void show_commit(char const * shorthand) {
 
     try {
         std::cout << "rebase:\n";
-        for (auto && op : repo[git_rebase_init](nullptr, nullptr, nullptr, nullptr)) {
+        for (auto op : repo[git_rebase_init](nullptr, nullptr, nullptr, nullptr)) {
             std::cout << "  " << &op->id << "\n";
         }
     } catch (std::exception const & e) {
