@@ -52,9 +52,14 @@ void show_commit(char const * shorthand) {
         std::cout << "  " << conflict.ancestor << "\n";
     }
 
-    std::cout << "notes:\n";
-    for (auto && note : repo[git_note_iterator_new]("refs/notes/commits")) {
-        std::cout << "  " << &note.note_id << "\n";
+    char const * notes = "refs/notes/commits";
+    try {
+        std::cout << "notes:\n";
+        for (auto && note : repo[git_note_iterator_new](notes)) {
+            std::cout << "  " << &note.note_id << "\n";
+        }
+    } catch (std::exception const & e) {
+        std::cerr << "Error accessing " << notes << ": " << e.what() << "\n";
     }
 
     try {
