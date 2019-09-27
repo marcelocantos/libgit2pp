@@ -5,7 +5,7 @@ LINK.o = $(LINK.cc)
 all: walk
 
 test: walk
-	./walk master
+	./walk HEAD
 
 walk:
 walk.o: ../git2pp.h
