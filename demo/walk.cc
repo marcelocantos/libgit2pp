@@ -64,7 +64,8 @@ void show_commit(char const * shorthand) {
 
     try {
         std::cout << "rebase:\n";
-        for (auto && op : repo[git_rebase_init](nullptr, nullptr, nullptr, nullptr)) {
+        auto upstream = repo[git_annotated_commit_from_ref](&*parent0.as<git_reference>());
+        for (auto && op : repo[git_rebase_init](nullptr, &*upstream, nullptr, nullptr)) {
             std::cout << "  " << &op->id << "\n";
         }
     } catch (std::exception const & e) {

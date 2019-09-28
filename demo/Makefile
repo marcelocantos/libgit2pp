@@ -2,10 +2,24 @@ CXXFLAGS += -std=c++17
 LDLIBS = -lgit2
 LINK.o = $(LINK.cc)
 
-all: walk
+ifeq "$(ARCH)" ""
+$(error missing ARCH)
+endif
 
-test: walk
-	./walk HEAD
+OUT=out/$(ARCH)
 
-walk:
-walk.o: ../git2pp.h
+WALK = $(OUT)/walk
+
+all: $(WALK)
+
+test: $(WALK)
+	$< HEAD
+
+$(WALK): $(WALK).o
+	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+$(WALK).o: walk.cc ../git2pp.h $(OUT)
+	$(COMPILE.cc) $(OUTPUT_OPTION) $<
+
+$(OUT):
+	mkdir -p $@
