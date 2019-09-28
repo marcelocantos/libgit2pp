@@ -258,7 +258,7 @@ namespace git2pp {
 
         template <typename U>
         UniquePtr<U> as() && {
-            return {(U *)t_.release()};
+            return (U *)t_.release();
         }
 
         template <typename U>
@@ -277,7 +277,7 @@ namespace git2pp {
         UniquePtr<T> wrap(int (*f)(T * * t, Params... params), Args &&... args) {
             T * t;
             check(f(&t, std::forward<Args>(args)...));
-            return {t};
+            return t;
         }
 
         template <typename... Params, typename... Args>
