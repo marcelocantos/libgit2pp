@@ -1,5 +1,7 @@
 # libgit2pp
 
+![C/C++ CI status](https://github.com/marcelocantos/libgit2pp/workflows/C%2fC%2b%2b%20CI/badge.svg)
+
 C++ convenience wrappers for libgit2. libgit2pp is a single header file, git2pp.h,
 to include in lieu of git2.h. Put it wherever suits your project.
 
