@@ -76,7 +76,7 @@ void show_commit(char const * shorthand) {
 
 int main(int argc, char * argv[]) {
     if (argc != 2) {
-        std::cerr << "Usage: demo <branch>";
+        std::cerr << "Usage: demo <branch>\n";
         return 1;
     }
     show_commit(argv[1]);
