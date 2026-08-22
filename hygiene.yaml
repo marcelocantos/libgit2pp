@@ -1,0 +1,342 @@
+# hygiene.yaml — declared, drift-validated hygiene posture for this repo.
+# Schema reference: the `hygiene` skill (~/.claude/skills/hygiene/SKILL.md).
+# Validate with `/hygiene`; aggregate the fleet with `/hygiene fleet`. Sibling
+# to bullseye.yaml: bullseye tracks aspirational state ("achieve X"); hygiene
+# tracks steady-state ("we maintain X").
+#
+# Tiers are PER DIMENSION (schema v1). For each dimension the held tier is the
+# highest T such that every item in that dimension with tier <= T is satisfied.
+# `floors` is the per-dimension ratchet: a dimension dropping below its floor
+# is DRIFT and fails the check. `aspires` is the gap horizon for reporting.
+# `enforce` is intent-only metadata and does NOT affect tiers.
+
+schema_version: 1
+
+repo: libgit2pp
+aspires: 3
+floors:            # per-dimension held-tier ratchet; below floor => DRIFT
+  correctness: 1   # CI runs demo/Makefile `test`; not a hermetic suite
+  security: 0      # no scanners, no pinned libgit2, no Actions permissions block
+  quality: 0       # no format/lint gate
+  deps: 0          # apt libgit2-dev unpinned; Dockerfile clones libgit2 unpinned
+  release: 0       # header-only drop-in; no tags or release workflow
+  governance: 2    # Apache-2.0 + README + demo/.gitignore; squash-only on GitHub
+  build: 1         # Actions compiles demo/walk.cc; no pinned toolchain
+  docs: 1          # README is the API doc; no generated docs / CONTRIBUTING
+  perf: 0          # thin RAII façade; no benchmark suite
+  vcs: 0           # no committed git hooks
+  agent: 0         # no AGENTS.md / CLAUDE.md / bullseye.yaml
+
+tiers:
+  1: baseline    # LICENSE + README + .gitignore; tests build & run
+  2: maintained  # platform matrix, examples run, lint/format, release+governance
+  3: hardened    # formal specs, security scanning, signed releases, fuzzing, perf
+
+# evidence (one key per item): ci_job | ci_step{workflow,name} | make_target |
+#   command | file{path,matches?} | gh_setting{key,equals} | scanner{tool,config?}
+#   | manual{last_verified} | absent:<evidence>
+# state: enforced|present|manual|planned|skipped  (reason required if planned/skipped)
+# cadence: continuous|per-release|periodic:<dur>|once-must-hold
+# enforce: blocking|warning|informational  (intent only; does not affect tiers)
+
+items:
+
+  # ============================== CORRECTNESS =============================
+  - id: correctness.demo-ci
+    dim: correctness
+    desc: GitHub Actions C/C++ CI compiles demo/walk.cc and runs `ARCH=linux make test`
+    state: enforced
+    cadence: continuous
+    enforce: blocking
+    tier: 1
+    evidence: {ci_job: ccpp.yml#build}
+
+  - id: correctness.hermetic-tests
+    dim: correctness
+    desc: Test recipe builds a throwaway git fixture and asserts library invariants (not the host checkout)
+    state: planned
+    cadence: continuous
+    enforce: blocking
+    tier: 2
+    reason: >-
+      Sole oracle is demo/out/$(ARCH)/walk HEAD against whatever repo
+      git_repository_open_ext finds (this checkout). No assertions, no fixture;
+      shallow clones fail (ENT-001).
+    evidence: {absent: {file: {path: tests}}}
+
+  - id: correctness.test-matrix
+    dim: correctness
+    desc: Demo/tests run on more than ubuntu-latest (macOS and/or a second libgit2)
+    state: planned
+    cadence: continuous
+    enforce: warning
+    tier: 2
+    reason: ccpp.yml#build is a single ubuntu-latest job with unpinned apt libgit2-dev.
+    evidence: {absent: {ci_job: ccpp.yml#macos}}
+
+  - id: correctness.sanitizers
+    dim: correctness
+    desc: ASan+UBSan (and ideally TSan) run against the demo or a fixture suite
+    state: planned
+    cadence: continuous
+    enforce: warning
+    tier: 3
+    reason: No sanitizer job or flags in demo/Makefile / ccpp.yml.
+    evidence: {absent: {ci_job: ccpp.yml#sanitize}}
+
+  - id: correctness.fuzzing
+    dim: correctness
+    desc: Fuzz harness over UniquePtr wrapping / iterator edges
+    state: planned
+    cadence: continuous
+    enforce: informational
+    tier: 3
+    reason: Header-only façade; no fuzz targets or OSS-Fuzz integration.
+    evidence: {absent: {file: {path: fuzz}}}
+
+  # =========================== SECURITY / SUPPLY ==========================
+  - id: security.secret-scan
+    dim: security
+    desc: Secret scanning (gitleaks) in pre-commit and/or CI
+    state: planned
+    cadence: continuous
+    enforce: blocking
+    tier: 3
+    reason: No gitleaks config or CI invocation; relying on manual review.
+    evidence: {absent: {scanner: {tool: gitleaks}}}
+
+  - id: security.sast
+    dim: security
+    desc: Static application security testing (CodeQL C/C++)
+    state: planned
+    cadence: continuous
+    enforce: warning
+    tier: 3
+    reason: No CodeQL workflow; clang sanitizers are also absent.
+    evidence: {absent: {file: {path: .github/workflows/codeql.yml}}}
+
+  - id: security.dep-vuln-scan
+    dim: security
+    desc: Vulnerability scanning of the libgit2 the demo links (osv-scanner or similar)
+    state: planned
+    cadence: periodic:30d
+    enforce: warning
+    tier: 3
+    reason: Demo links distro libgit2-dev; Dockerfile clones libgit2 master. No CVE watch.
+    evidence: {absent: {scanner: {tool: osv-scanner}}}
+
+  - id: security.actions-perms
+    dim: security
+    desc: GitHub Actions default token permissions are read-only (least privilege)
+    state: planned
+    cadence: once-must-hold
+    enforce: warning
+    tier: 3
+    reason: No top-level `permissions:` block in ccpp.yml; inherits repo default.
+    evidence: {absent: {file: {path: .github/workflows/ccpp.yml, matches: '(?m)^permissions:'}}}
+
+  - id: security.dependabot
+    dim: security
+    desc: Dependabot (or equivalent) watches Actions and OS-package pins
+    state: planned
+    cadence: periodic:30d
+    enforce: informational
+    tier: 3
+    reason: No .github/dependabot.yml; Actions checkout pin and libgit2-dev are unwatched.
+    evidence: {absent: {file: {path: .github/dependabot.yml}}}
+
+  # ============================== CODE QUALITY ============================
+  - id: quality.format
+    dim: quality
+    desc: Sources are clang-format clean, enforced in CI
+    state: planned
+    cadence: continuous
+    enforce: warning
+    tier: 3
+    reason: No .clang-format; formatting is by-hand.
+    evidence: {absent: {file: {path: .clang-format}}}
+
+  - id: quality.lint
+    dim: quality
+    desc: clang-tidy (or equivalent) runs in CI over git2pp.h / demo
+    state: planned
+    cadence: continuous
+    enforce: warning
+    tier: 3
+    reason: No .clang-tidy and no lint step in ccpp.yml.
+    evidence: {absent: {file: {path: .clang-tidy}}}
+
+  # =========================== DEPENDENCY HEALTH ==========================
+  - id: deps.libgit2-pin
+    dim: deps
+    desc: CI and Dockerfile pin a libgit2 version (or a documented compatibility range is tested)
+    state: planned
+    cadence: per-release
+    enforce: warning
+    tier: 3
+    reason: >-
+      ccpp.yml `apt-get install libgit2-dev` and Dockerfile `git clone` of
+      libgit2 master are unpinned; ubuntu-latest package will drift (ENT-006).
+    evidence: {absent: {file: {path: .github/workflows/ccpp.yml, matches: 'libgit2-dev='}}}
+
+  # ========================== RELEASE & VERSIONING =======================
+  - id: release.changelog
+    dim: release
+    desc: A maintained CHANGELOG records user-visible changes per release
+    state: planned
+    cadence: per-release
+    enforce: warning
+    tier: 3
+    reason: History lives in git; no tags, no GitHub releases, no CHANGELOG.md.
+    evidence: {absent: {file: {path: CHANGELOG.md}}}
+
+  - id: release.artifacts
+    dim: release
+    desc: Versioned release artifacts built by CI
+    state: skipped
+    cadence: per-release
+    enforce: informational
+    tier: 3
+    reason: >-
+      Header-only drop-in (`git2pp.h` in lieu of git2.h); consumers vendor the
+      header. No binaries, packages, or tags to publish.
+    evidence: {absent: {file: {path: .github/workflows/release.yml}}}
+
+  # ============================ GOVERNANCE / META ========================
+  - id: governance.license
+    dim: governance
+    desc: Apache-2.0 LICENSE present
+    state: present
+    cadence: once-must-hold
+    enforce: blocking
+    tier: 1
+    evidence: {file: {path: LICENSE, matches: 'Apache License'}}
+
+  - id: governance.readme
+    dim: governance
+    desc: README present
+    state: present
+    cadence: once-must-hold
+    enforce: blocking
+    tier: 1
+    evidence: {file: {path: README.md}}
+
+  - id: governance.gitignore
+    dim: governance
+    desc: demo/.gitignore ignores ARCH build output (`/out`); no root .gitignore
+    state: present
+    cadence: once-must-hold
+    enforce: warning
+    tier: 1
+    evidence: {file: {path: demo/.gitignore, matches: '/out'}}
+
+  - id: governance.squash-only
+    dim: governance
+    desc: Repo is squash-merge only, with delete-branch-on-merge
+    state: enforced
+    cadence: once-must-hold
+    enforce: blocking
+    tier: 2
+    evidence: {gh_setting: {key: allow_merge_commit, equals: false}}
+
+  - id: governance.security-md
+    dim: governance
+    desc: SECURITY.md documents the vulnerability-disclosure process
+    state: planned
+    cadence: once-must-hold
+    enforce: informational
+    tier: 3
+    reason: Public repo without a published disclosure policy yet.
+    evidence: {absent: {file: {path: SECURITY.md}}}
+
+  # ================================= BUILD ===============================
+  - id: build.ci-compile
+    dim: build
+    desc: CI compiles the demo (`ARCH=linux make` in demo/)
+    state: enforced
+    cadence: continuous
+    enforce: blocking
+    tier: 1
+    evidence: {ci_step: {workflow: ccpp.yml, name: make}}
+
+  - id: build.cxx17
+    dim: build
+    desc: Demo build requires C++17
+    state: present
+    cadence: once-must-hold
+    enforce: informational
+    tier: 1
+    evidence: {file: {path: demo/Makefile, matches: '-std=c[+][+]17'}}
+
+  - id: build.pinned-toolchain
+    dim: build
+    desc: CI pins the runner image and libgit2 package (reproducible compile)
+    state: planned
+    cadence: continuous
+    enforce: warning
+    tier: 3
+    reason: ubuntu-latest + unpinned libgit2-dev; Dockerfile is unused ubuntu:18.04.
+    evidence: {absent: {file: {path: .github/workflows/ccpp.yml, matches: 'ubuntu-\\d+\\.\\d+'}}}
+
+  # ============================ DOCUMENTATION ============================
+  - id: docs.api-readme
+    dim: docs
+    desc: Public API (Session, UniquePtr, check/Error) is documented in README.md
+    state: present
+    cadence: once-must-hold
+    enforce: warning
+    tier: 1
+    evidence: {file: {path: README.md, matches: 'git2pp::Session'}}
+
+  - id: docs.contributing
+    dim: docs
+    desc: CONTRIBUTING (or equivalent) documents how to build and extend the wrapper
+    state: planned
+    cadence: once-must-hold
+    enforce: informational
+    tier: 3
+    reason: README has usage examples; no CONTRIBUTING.md or build-from-clone guide beyond demo/Makefile.
+    evidence: {absent: {file: {path: CONTRIBUTING.md}}}
+
+  # ============================== PERFORMANCE ===========================
+  - id: perf.benchmarks
+    dim: perf
+    desc: Benchmark suite for wrap overhead vs raw libgit2
+    state: planned
+    cadence: per-release
+    enforce: informational
+    tier: 3
+    reason: Thin RAII/metaprogramming façade; no independent hot path or benches/.
+    evidence: {absent: {file: {path: benches}}}
+
+  # ============================== VCS / HISTORY =========================
+  - id: vcs.pre-commit-hook
+    dim: vcs
+    desc: Committed git hooks (scripts/hooks) gate locally before commit
+    state: planned
+    cadence: once-must-hold
+    enforce: informational
+    tier: 3
+    reason: No scripts/hooks; core.hooksPath is the default .git/hooks.
+    evidence: {absent: {file: {path: scripts/hooks/pre-commit}}}
+
+  # =================== AGENT-READINESS / ONBOARDING ====================
+  - id: agent.claude-md
+    dim: agent
+    desc: AGENTS.md / CLAUDE.md present (conventions discoverable by agents)
+    state: planned
+    cadence: once-must-hold
+    enforce: warning
+    tier: 2
+    reason: Header-only demo repo; no AGENTS.md or CLAUDE.md.
+    evidence: {absent: {file: {path: AGENTS.md}}}
+
+  - id: agent.bullseye
+    dim: agent
+    desc: bullseye.yaml present (convergence targets discoverable)
+    state: planned
+    cadence: once-must-hold
+    enforce: informational
+    tier: 2
+    reason: No bullseye.yaml; followable work is not in-repo yet.
+    evidence: {absent: {file: {path: bullseye.yaml}}}
