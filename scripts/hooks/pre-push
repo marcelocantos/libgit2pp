@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Pre-push owner gate (think 🎯T8, bucket C). Executes `make gate` and refuses
+# the push on a non-zero exit. The hook runs the oracle; it never reads a
+# "tests passed" claim. Agents must not pass --no-verify; the owner's
+# emergency bypass is `git push --no-verify`.
+#
+# Wired by `make hooks` (core.hooksPath=scripts/hooks). That setting makes git
+# read THIS directory instead of .git/hooks, so anything that used to live
+# there is silently gone — including git-lfs's hooks if `git lfs install` ever
+# ran. This repo has no LFS objects today; the chain at the bottom keeps LFS
+# uploads working if that changes, without anyone having to remember.
+set -euo pipefail
+
+remote="${1:-origin}"
+
+# Git feeds "<local ref> <local sha> <remote ref> <remote sha>" lines on
+# stdin. Keep a copy: the gate's own commands would otherwise consume the
+# list that git-lfs pre-push needs to read.
+refs="$(mktemp)"
+trap 'rm -f "$refs"' EXIT
+cat > "$refs"
+
+zero_sha="0000000000000000000000000000000000000000"
+updates=0
+while read -r local_ref local_sha remote_ref remote_sha || [[ -n "${local_ref:-}" ]]; do
+	[[ -z "${local_ref:-}" ]] && continue
+	if [[ "$local_sha" == "$zero_sha" ]]; then
+		echo "pre-push: deleting $remote_ref on $remote (no gate for a deletion)"
+		continue
+	fi
+	updates=$((updates + 1))
+	echo "pre-push: $local_ref -> $remote/${remote_ref#refs/heads/} (${local_sha:0:7})"
+done < "$refs"
+
+# Git exports GIT_DIR, GIT_INDEX_FILE and friends into its hooks, and they are
+# inherited by everything the gate runs. Any test that shells out to git
+# against a scratch repo then operates on THIS repository instead — observed
+# once as `git init` flipping a real checkout to core.bare=true. Strip them
+# before doing anything, including resolving the worktree root: with GIT_DIR
+# pointing at the common dir, --show-toplevel can name the wrong worktree.
+nogit() {
+	env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR \
+		-u GIT_PREFIX -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES \
+		-u GIT_QUARANTINE_PATH -u GIT_PUSH_CERT_NONCE -u GIT_REFLOG_ACTION "$@"
+}
+
+if [[ "$updates" -gt 0 ]]; then
+	cd "$(nogit git rev-parse --show-toplevel)"
+	echo "pre-push: running make gate (docs/gate.md)"
+	if ! nogit make gate; then
+		echo "" >&2
+		echo "pre-push: make gate FAILED — push to $remote refused." >&2
+		echo "pre-push: fix the failure and push again. --no-verify is the owner's bypass, not an agent's." >&2
+		exit 1
+	fi
+	echo "pre-push: gate green — pushing"
+fi
+
+# git always passes <remote name> <remote url>; a bare `git hook run
+# pre-push` does not, and git-lfs refuses to run without them.
+if [[ $# -gt 0 ]] && command -v git-lfs >/dev/null 2>&1; then
+	git lfs pre-push "$@" < "$refs"
+fi
