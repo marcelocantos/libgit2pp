@@ -12,7 +12,10 @@ WALK = $(OUT)/walk
 
 all: $(WALK)
 
-test: $(WALK)
+# Not a test: there are no assertions here, and the repository it reads is
+# whatever git_repository_open_ext finds above the cwd. The suite lives in
+# ../test. This target just runs the example.
+run: $(WALK)
 	$< HEAD
 
 $(WALK): $(WALK).o

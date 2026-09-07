@@ -11,9 +11,9 @@ jobs:
     - uses: actions/checkout@v1
     - name: Install libgit2
       run: sudo apt-get install libgit2-dev
-    - name: make
+    - name: build example
       working-directory: demo
       run: ARCH=linux make
-    - name: make test
-      working-directory: demo
+    - name: run test suite
+      working-directory: test
       run: ARCH=linux make test

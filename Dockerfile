@@ -19,8 +19,10 @@ RUN mkdir -p /github.com/libgit2 && \
 WORKDIR /github.com/libgit2/libgit2
 RUN mkdir build && cd build && cmake .. && cmake --build .
 
-RUN mkdir -p /src/demo
+RUN mkdir -p /src/demo /src/test /src/vendor
 COPY git2pp.h /src
 COPY demo /src/demo
-WORKDIR /src/demo
+COPY test /src/test
+COPY vendor /src/vendor
+WORKDIR /src/test
 RUN ARCH=linux make test
