@@ -242,17 +242,38 @@ namespace git2pp {
             };
         }
 
+        // Status-returning libgit2 functions (`int`, typically 0 / GIT_E*)
+        // go through check() and return void. Non-int R (pointer getters,
+        // unsigned counts, git_oid) is returned raw.
+        //
+        // int-as-data predicates are therefore void through operator[] —
+        // call them as C: git_repository_is_bare(&*repo). Enumerated from
+        // libgit2 1.9 headers, not assumed absent:
+        //   git_repository_is_bare / is_empty / is_shallow / is_worktree
+        //   git_repository_head_detached / head_unborn
+        //   git_reference_is_branch / is_remote / is_tag / is_note
+        //   git_branch_is_head / is_checked_out
+        //   git_index_has_conflicts, git_blob_is_binary, git_remote_connected
+        //   git_graph_descendant_of / git_graph_reachable_from_any
         template <typename R, typename... Params, typename = std::enable_if<!std::is_const_v<T>>>
         auto operator[](R (* method)(T *, Params...)) const {
-            return [this, method](auto &&... args) {
-                return method(&*t_, std::forward<decltype(args)>(args)...);
+            return [this, method](auto &&... args) -> std::conditional_t<std::is_same_v<R, int>, void, R> {
+                if constexpr (std::is_same_v<R, int>) {
+                    check(method(&*t_, std::forward<decltype(args)>(args)...));
+                } else {
+                    return method(&*t_, std::forward<decltype(args)>(args)...);
+                }
             };
         }
 
         template <typename R, typename... Params>
         auto operator[](R (* method)(T const *, Params...)) const {
-            return [this, method](auto &&... args) {
-                return method(&*t_, std::forward<decltype(args)>(args)...);
+            return [this, method](auto &&... args) -> std::conditional_t<std::is_same_v<R, int>, void, R> {
+                if constexpr (std::is_same_v<R, int>) {
+                    check(method(&*t_, std::forward<decltype(args)>(args)...));
+                } else {
+                    return method(&*t_, std::forward<decltype(args)>(args)...);
+                }
             };
         }
 

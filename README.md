@@ -13,7 +13,15 @@ succinct code than raw libgit2.
 
 * namespace **`git2pp`**
 
-  * **`Error`**/**`check`:** check() throws Error when a libgit2 result indicates failure.
+  * **`Error`**/**`check`:** `check()` throws `Error` when a libgit2 result is
+    negative (`rc < 0`). `UniquePtr::operator[]` applies this to every wrapped
+    function whose C return type is exactly `int` (status-only calls such as
+    `git_revwalk_push` / `git_revwalk_sorting`) and returns `void`. Non-`int`
+    returns — pointer getters, `unsigned` counts, `git_oid` — stay raw.
+
+    libgit2 predicates that return `int` as data (`git_repository_is_bare`,
+    `git_reference_is_branch`, `git_index_has_conflicts`, …) are therefore
+    `void` through `operator[]`. Call them as C: `git_repository_is_bare(&*repo)`.
 
   * **`Session`:** wraps `git_libgit2_init()` and `git_libgit2_shutdown()` in RAII.
 

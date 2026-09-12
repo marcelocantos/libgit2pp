@@ -104,3 +104,18 @@ TEST_CASE("peeling_an_unknown_ref_throws_error") {
     auto repo = open_fixture(git2, fixture_repo());
     CHECK_THROWS_AS(repo[git_reference_dwim]("no-such-branch"), git2pp::Error);
 }
+
+TEST_CASE("revwalk_push_bad_oid_throws") {
+    git2pp::Session git2;
+    auto repo = open_fixture(git2, fixture_repo());
+    auto revwalk = repo[git_revwalk_new]();
+    git_oid zero{};
+    CHECK_THROWS_AS(revwalk[git_revwalk_push](&zero), git2pp::Error);
+}
+
+TEST_CASE("revwalk_sorting_ok_does_not_throw") {
+    git2pp::Session git2;
+    auto repo = open_fixture(git2, fixture_repo());
+    auto revwalk = repo[git_revwalk_new]();
+    CHECK_NOTHROW(revwalk[git_revwalk_sorting](GIT_SORT_TIME));
+}
